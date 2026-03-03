@@ -1,0 +1,30 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Check file structure
+      run: |
+        echo "Checking application files..."
+        ls -la
+        test -f app/Dockerfile && echo "✓ Dockerfile exists"
+        test -f app/index.js && echo "✓ index.js exists"
+        test -f app/package.json && echo "✓ package.json exists"
+        test -f k8s/deployment.yaml && echo "✓ deployment.yaml exists"
+        test -f k8s/service.yaml && echo "✓ service.yaml exists"
+    
+    - name: Validate package.json
+      run: |
+        if [ -f app/package.json ]; then
+          echo "✓ package.json found"
+          cat app/package.json | grep "express" && echo "✓ Express dependency found"
+        fi
