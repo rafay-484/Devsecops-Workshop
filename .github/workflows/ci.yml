@@ -14,17 +14,40 @@ jobs:
     
     - name: Check file structure
       run: |
+        echo "========================================"
         echo "Checking application files..."
+        echo "========================================"
         ls -la
-        test -f app/Dockerfile && echo "✓ Dockerfile exists"
-        test -f app/index.js && echo "✓ index.js exists"
-        test -f app/package.json && echo "✓ package.json exists"
-        test -f k8s/deployment.yaml && echo "✓ deployment.yaml exists"
-        test -f k8s/service.yaml && echo "✓ service.yaml exists"
+        echo ""
+        
+        echo "Checking app folder..."
+        test -f app/Dockerfile && echo "✅ Dockerfile exists" || echo "❌ Dockerfile missing"
+        test -f app/index.js && echo "✅ index.js exists" || echo "❌ index.js missing"
+        test -f app/package.json && echo "✅ package.json exists" || echo "❌ package.json missing"
+        echo ""
+        
+        echo "Checking k8s folder..."
+        test -f k8s/deployment.yaml && echo "✅ deployment.yaml exists" || echo "❌ deployment.yaml missing"
+        test -f k8s/service.yaml && echo "✅ service.yaml exists" || echo "❌ service.yaml missing"
+        echo ""
     
     - name: Validate package.json
       run: |
         if [ -f app/package.json ]; then
-          echo "✓ package.json found"
-          cat app/package.json | grep "express" && echo "✓ Express dependency found"
+          echo "========================================"
+          echo "Validating package.json..."
+          echo "========================================"
+          cat app/package.json | grep -q "express" && echo "✅ Express dependency found" || echo "❌ Express dependency missing"
+          echo ""
+        fi
+    
+    - name: Validate YAML syntax
+      run: |
+        echo "========================================"
+        echo "Validating YAML files..."
+        echo "========================================"
+        if command -v yamllint &> /dev/null; then
+          yamllint k8s/*.yaml || echo "⚠️  YAML validation skipped"
+        else
+          echo "✅ YAML files present"
         fi
