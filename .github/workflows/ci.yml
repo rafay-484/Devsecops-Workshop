@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Check file structure
       run: |
         echo "========================================"
@@ -19,35 +19,129 @@ jobs:
         echo "========================================"
         ls -la
         echo ""
-        
+
         echo "Checking app folder..."
-        test -f app/Dockerfile && echo "✅ Dockerfile exists" || echo "❌ Dockerfile missing"
-        test -f app/index.js && echo "✅ index.js exists" || echo "❌ index.js missing"
-        test -f app/package.json && echo "✅ package.json exists" || echo "❌ package.json missing"
+        test -f app/Dockerfile && echo "✅ Dockerfile exists" || { echo "❌ Dockerfile missing"; exit 1; }
+        test -f app/index.js && echo "✅ index.js exists" || { echo "❌ index.js missing"; exit 1; }
+        test -f app/package.json && echo "✅ package.json exists" || { echo "❌ package.json missing"; exit 1; }
         echo ""
-        
+
         echo "Checking k8s folder..."
-        test -f k8s/deployment.yaml && echo "✅ deployment.yaml exists" || echo "❌ deployment.yaml missing"
-        test -f k8s/service.yaml && echo "✅ service.yaml exists" || echo "❌ service.yaml missing"
+        test -f k8s/deployment.yaml && echo "✅ deployment.yaml exists" || { echo "❌ deployment.yaml missing"; exit 1; }
+        test -f k8s/service.yaml && echo "✅ service.yaml exists" || { echo "❌ service.yaml missing"; exit 1; }
         echo ""
-    
+
     - name: Validate package.json
       run: |
-        if [ -f app/package.json ]; then
-          echo "========================================"
-          echo "Validating package.json..."
-          echo "========================================"
-          cat app/package.json | grep -q "express" && echo "✅ Express dependency found" || echo "❌ Express dependency missing"
-          echo ""
-        fi
-    
+        echo "========================================"
+        echo "Validating package.json..."
+        echo "========================================"
+        cat app/package.json | grep -q "express" && echo "✅ Express dependency found" || { echo "❌ Express dependency missing"; exit 1; }
+        cat app/package.json | grep -q '"start"' && echo "✅ start script found" || { echo "❌ start script missing"; exit 1; }
+        echo ""
+
     - name: Validate YAML syntax
       run: |
         echo "========================================"
         echo "Validating YAML files..."
         echo "========================================"
         if command -v yamllint &> /dev/null; then
-          yamllint k8s/*.yaml || echo "⚠️  YAML validation skipped"
+          yamllint k8s/*.yaml
         else
           echo "✅ YAML files present"
         fi
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: app/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        echo "========================================"
+        echo "Installing Node.js dependencies..."
+        echo "========================================"
+        npm ci
+        echo "✅ Dependencies installed"
+
+    - name: Start app and run health check
+      run: |
+        echo "========================================"
+        echo "Starting application and verifying endpoints..."
+        echo "========================================"
+        npm start &
+        APP_PID=$!
+        echo "App started with PID $APP_PID"
+
+        # Wait for app to be ready
+        APP_READY=0
+        for i in $(seq 1 10); do
+          if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
+            echo "✅ App is ready"
+            APP_READY=1
+            break
+          fi
+          echo "Waiting for app... ($i/10)"
+          sleep 1
+        done
+
+        if [ "$APP_READY" -eq 0 ]; then
+          echo "❌ App did not become ready in time"
+          kill $APP_PID
+          exit 1
+        fi
+
+        echo ""
+        echo "Testing root endpoint..."
+        RESPONSE=$(curl -sf http://localhost:3000) || { echo "❌ Root endpoint request failed"; kill $APP_PID; exit 1; }
+        echo "Response: $RESPONSE"
+        echo "$RESPONSE" | grep -q "DevSecOps" && echo "✅ Root endpoint OK" || { echo "❌ Root endpoint failed"; kill $APP_PID; exit 1; }
+
+        echo ""
+        echo "Testing health endpoint..."
+        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health)
+        echo "HTTP status: $HTTP_STATUS"
+        [ "$HTTP_STATUS" = "200" ] && echo "✅ Health endpoint OK" || { echo "❌ Health endpoint failed (got $HTTP_STATUS)"; kill $APP_PID; exit 1; }
+
+        kill $APP_PID
+        echo ""
+        echo "✅ All application checks passed"
+
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build Docker image
+      run: |
+        echo "========================================"
+        echo "Building Docker image..."
+        echo "========================================"
+        docker build -t devsecops-local:latest -f app/Dockerfile app/
+        echo "✅ Docker image built successfully"
+
+    - name: Test Docker container
+      run: |
+        echo "========================================"
+        echo "Testing Docker container..."
+        echo "========================================"
+        docker run -d -p 3000:3000 --name test-app devsecops-local:latest
+        sleep 3
+
+        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health)
+        echo "Health check HTTP status: $HTTP_STATUS"
+        [ "$HTTP_STATUS" = "200" ] && echo "✅ Docker container health check passed" || { echo "❌ Docker container health check failed"; docker logs test-app; exit 1; }
+
+        docker stop test-app
+        docker rm test-app
+        echo "✅ Docker container test complete"
