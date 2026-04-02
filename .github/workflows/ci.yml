@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -38,6 +41,7 @@ jobs:
           echo "Validating package.json..."
           echo "========================================"
           cat app/package.json | grep -q "express" && echo "✅ Express dependency found" || echo "❌ Express dependency missing"
+          cat app/package.json | grep -q "\"start\"" && echo "✅ Start script found" || echo "❌ Start script missing"
           echo ""
         fi
     
@@ -51,3 +55,43 @@ jobs:
         else
           echo "✅ YAML files present"
         fi
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: app/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        echo "========================================"
+        echo "Installing dependencies..."
+        echo "========================================"
+        cd app
+        npm ci
+        echo "✅ Dependencies installed"
+
+    - name: Security audit
+      run: |
+        echo "========================================"
+        echo "Running security audit..."
+        echo "========================================"
+        cd app
+        npm audit --audit-level=high
+        echo "✅ Security audit passed"
+
+    - name: Run tests
+      run: |
+        echo "========================================"
+        echo "Running application tests..."
+        echo "========================================"
+        cd app
+        npm test
+        echo "✅ All tests passed"
+

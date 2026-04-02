@@ -9,6 +9,9 @@ app.get('/', (req, res) => {
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
-app.listen(PORT, () => {
+
+const server = app.listen(PORT, () => {
   console.log(`App running on port ${PORT}`);
 });
+
+module.exports = server;
