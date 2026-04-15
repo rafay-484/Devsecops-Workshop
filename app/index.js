@@ -118,7 +118,8 @@ app.get('/', (req, res) => {
             output.textContent = 'Contacting secure backend...\nVerifying HTTP Headers...';
             
             try {
-              const res = await fetch('/api/users', {
+              // Add a timestamp query param to completely bust the browser cache!
+              const res = await fetch('/api/users?t=' + new Date().getTime(), {
                 method: 'GET',
                 headers: { 'Accept': 'application/json' }
               });
