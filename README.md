@@ -7,7 +7,7 @@
 ![Security Scans](https://img.shields.io/badge/Security-Trivy_&_npm_audit-red)
 
 ## 📋 Project Overview
-A complete, resume-worthy DevSecOps pipeline implementation utilizing Docker, Kubernetes (Minikube), and GitHub Actions. This project has been upgraded to demonstrate "Shift-Left" security practices.
+A complete, enterprise grade DevSecOps pipeline implementation utilizing Docker, Kubernetes (Minikube), and GitHub Actions. This project has been upgraded to demonstrate "Shift-Left" security practices.
 
 ## 🛠️ Technology Stack
 | Technology | Category | Purpose |
