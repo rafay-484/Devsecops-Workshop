@@ -83,6 +83,6 @@ jobs:
       - name: Verify K8s Manifests (Dry-run deployment)
         run: |
           echo "Simulating CI/CD deployment to Kubernetes cluster..."
-          kubectl create apply -f k8s/deployment.yaml --dry-run=client
-          kubectl create apply -f k8s/service.yaml --dry-run=client
+          kubectl apply -f k8s/deployment.yaml --dry-run=client
+          kubectl apply -f k8s/service.yaml --dry-run=client
           echo "Deployment manifests validated successfully."
